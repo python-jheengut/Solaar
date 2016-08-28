@@ -24,19 +24,20 @@ _log = getLogger(__name__)
 del getLogger
 
 from copy import copy as _copy
-
+import math
 
 from .common import (
 				NamedInt as _NamedInt,
 				NamedInts as _NamedInts,
 				bytes2int as _bytes2int,
+				int2bytes as _int2bytes,
 			)
 
 #
 #
 #
 
-KIND = _NamedInts(toggle=0x01, choice=0x02, range=0x12)
+KIND = _NamedInts(toggle=0x01, choice=0x02, range=0x04)
 
 class Setting(object):
 	"""A setting descriptor.
@@ -80,6 +81,14 @@ class Setting(object):
 		assert hasattr(self, '_device')
 
 		return self._validator.choices if self._validator.kind & KIND.choice else None
+
+	@property
+	def range(self):
+		assert hasattr(self, '_value')
+		assert hasattr(self, '_device')
+
+		if self._validator.kind == KIND.range:
+			return (self._validator.min_value, self._validator.max_value)
 
 	def read(self, cached=True):
 		assert hasattr(self, '_value')
@@ -291,17 +300,17 @@ class BooleanValidator(object):
 			if current_value is not None and to_write == ord(current_value[:1]):
 				return None
 		else:
-			to_write = list(to_write)
+			to_write = bytearray(to_write)
 			count = len(self.mask)
 			for i in range(0, count):
-				b = ord(to_write[i])
+				b = ord(to_write[i:i+1])
 				m = ord(self.mask[i : i + 1])
 				assert b & m == b
 				# b &= m
 				if current_value is not None and self.needs_current_value:
 					b |= ord(current_value[i : i + 1]) & (0xFF ^ m)
-				to_write[i] = chr(b)
-			to_write = b''.join(to_write)
+				to_write[i] = b
+			to_write = bytes(to_write)
 
 			if current_value is not None and to_write == current_value[:len(to_write)]:
 				return None
@@ -317,7 +326,11 @@ class ChoicesValidator(object):
 
 	kind = KIND.choice
 
-	def __init__(self, choices):
+	"""Translates between NamedInts and a byte sequence.
+	:param choices: a list of NamedInts
+	:param bytes_count: the size of the derived byte sequence. If None, it
+	will be calculated from the choices."""
+	def __init__(self, choices, bytes_count=None):
 		assert choices is not None
 		assert isinstance(choices, _NamedInts)
 		assert len(choices) > 2
@@ -326,6 +339,9 @@ class ChoicesValidator(object):
 
 		max_bits = max(x.bit_length() for x in choices)
 		self._bytes_count = (max_bits // 8) + (1 if max_bits % 8 else 0)
+		if bytes_count:
+			assert self._bytes_count <= bytes_count
+			self._bytes_count = bytes_count
 		assert self._bytes_count < 8
 
 	def validate_read(self, reply_bytes):
@@ -349,3 +365,36 @@ class ChoicesValidator(object):
 			raise ValueError("invalid choice %r" % new_value)
 		assert isinstance(choice, _NamedInt)
 		return choice.bytes(self._bytes_count)
+
+class RangeValidator(object):
+	__slots__ = ('min_value', 'max_value', 'flag', '_bytes_count', 'needs_current_value')
+
+	kind = KIND.range
+
+	"""Translates between integers and a byte sequence.
+	:param min_value: minimum accepted value (inclusive)
+	:param max_value: maximum accepted value (inclusive)
+	:param bytes_count: the size of the derived byte sequence. If None, it
+	will be calculated from the range."""
+	def __init__(self, min_value, max_value, bytes_count=None):
+		assert max_value > min_value
+		self.min_value = min_value
+		self.max_value = max_value
+		self.needs_current_value = False
+
+		self._bytes_count = math.ceil(math.log(max_value + 1, 256))
+		if bytes_count:
+			assert self._bytes_count <= bytes_count
+			self._bytes_count = bytes_count
+		assert self._bytes_count < 8
+
+	def validate_read(self, reply_bytes):
+		reply_value = _bytes2int(reply_bytes[:self._bytes_count])
+		assert reply_value >= self.min_value, "%s: failed to validate read value %02X" % (self.__class__.__name__, reply_value)
+		assert reply_value <= self.max_value, "%s: failed to validate read value %02X" % (self.__class__.__name__, reply_value)
+		return reply_value
+
+	def prepare_write(self, new_value, current_value=None):
+		if new_value < self.min_value or new_value > self.max_value:
+			raise ValueError("invalid choice %r" % new_value)
+		return _int2bytes(new_value, self._bytes_count)

@@ -27,7 +27,8 @@ from logitech_receiver import settings as _settings
 def _print_setting(s, verbose=True):
 	print ('#', s.label)
 	if verbose:
-		print ('#', s.description.replace('\n', ' '))
+		if s.description:
+			print ('#', s.description.replace('\n', ' '))
 		if s.kind == _settings.KIND.toggle:
 			print ('#   possible values: on/true/t/yes/y/1 or off/false/f/no/n/0')
 		elif s.choices:
@@ -111,10 +112,16 @@ def run(receivers, args, find_receiver, find_device):
 			raise Exception("possible values for '%s' are: [%s]" % (setting.name, ', '.join(str(v) for v in setting.choices)))
 			value = setting.choices[value]
 
+	elif setting.kind == _settings.KIND.range:
+		try:
+			value = int(args.value)
+		except ValueError:
+			raise Exception("can't interpret '%s' as integer" % args.value)
+
 	else:
 		raise NotImplemented
 
 	result = setting.write(value)
 	if result is None:
-		raise Exception("failed to set '%s' = '%s' [%r]" % (setting.name, value, value))
+		raise Exception("failed to set '%s' = '%s' [%r]" % (setting.name, str(value), value))
 	_print_setting(setting, False)

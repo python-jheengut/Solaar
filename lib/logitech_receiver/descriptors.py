@@ -163,6 +163,11 @@ _D('Wireless Touch Keyboard K400', protocol=2.0, wpid=('400E', '4024'),
 							_FS.fn_swap()
 						],
 				)
+_D('Wireless Touch Keyboard K400 Plus', protocol=2.0, wpid='404D',
+                                settings=[
+                                                        _FS.new_fn_swap()
+                                                ],
+                                )
 _D('Wireless Keyboard K520', protocol=1.0, wpid='2011',
 				registers=(_R.battery_status, ),
 				settings=[
@@ -199,7 +204,7 @@ _D('Illuminated Living-Room Keyboard K830', protocol=2.0, wpid='4032',
 
 # Mice
 
-_D('Wireless Mouse M175')
+_D('Wireless Mouse M175', protocol=2.0, wpid='4008')
 _D('Wireless Mouse M185')
 _D('Wireless Mouse M187', protocol=2.0, wpid='4019')
 _D('Wireless Mouse M215', protocol=1.0, wpid='1020')
@@ -215,7 +220,10 @@ _D('Wireless Mouse M310', protocol=1.0, wpid='1024',
 				)
 _D('Wireless Mouse M315')
 _D('Wireless Mouse M317')
-_D('Wireless Mouse M325')
+_D('Wireless Mouse M325', protocol=2.0, wpid='400A',
+				settings=[
+							_FS.smooth_scroll(),
+				])
 _D('Wireless Mouse M345', protocol=2.0, wpid='4017')
 _D('Wireless Mouse M350', protocol=1.0, wpid='101C',
 				registers=(_R.battery_charge, ),
@@ -262,6 +270,8 @@ _D('Performance Mouse MX', codename='Performance MX', protocol=1.0, wpid='101A',
 							_RS.side_scroll(),
 						],
 				)
+
+_D('Wireless Mouse MX Master', codename='MX Master', protocol=4.5, wpid='4041')
 
 _D('G7 Cordless Laser Mouse', codename='G7', protocol=1.0, wpid='1002',
 				registers=(_R.battery_status, ),
@@ -328,6 +338,13 @@ _D('MX Air', codename='MX Air', protocol=1.0, kind=_DK.mouse, wpid=('1007', '100
 _D('MX Revolution', codename='MX Revolution', protocol=1.0, kind=_DK.mouse, wpid=('1008', '100C'),
 				registers=(_R.battery_charge, ),
 				)
+_D('MX 1100 Cordless Laser Mouse', codename='MX 1100', protocol=1.0, kind=_DK.mouse, wpid='1014',
+                registers=(_R.battery_charge, ),
+                settings=[
+							_RS.smooth_scroll(),
+							_RS.side_scroll(),
+						],
+                )
 
 # Some exotics...
 

@@ -23,6 +23,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .i18n import _
 from . import hidpp10 as _hidpp10
 from . import hidpp20 as _hidpp20
+from .common import (
+				bytes2int as _bytes2int,
+				int2bytes as _int2bytes,
+				NamedInts as _NamedInts,
+				unpack as _unpack,
+			)
 from .settings import (
 				KIND as _KIND,
 				Setting as _Setting,
@@ -30,6 +36,7 @@ from .settings import (
 				FeatureRW as _FeatureRW,
 				BooleanValidator as _BooleanV,
 				ChoicesValidator as _ChoicesV,
+				RangeValidator as _RangeV,
 			)
 
 _DK = _hidpp10.DEVICE_KIND
@@ -70,6 +77,41 @@ def feature_toggle(name, feature,
 	rw = _FeatureRW(feature, read_function_id, write_function_id)
 	return _Setting(name, rw, validator, label=label, description=description, device_kind=device_kind)
 
+def feature_choices(name, feature, choices,
+					read_function_id, write_function_id,
+					bytes_count=None,
+					label=None, description=None, device_kind=None):
+	assert choices
+	validator = _ChoicesV(choices, bytes_count=bytes_count)
+	rw = _FeatureRW(feature, read_function_id, write_function_id)
+	return _Setting(name, rw, validator, kind=_KIND.choice, label=label, description=description, device_kind=device_kind)
+
+def feature_choices_dynamic(name, feature, choices_callback,
+					read_function_id, write_function_id,
+					bytes_count=None,
+					label=None, description=None, device_kind=None):
+	# Proxy that obtains choices dynamically from a device
+	def instantiate(device):
+		# Obtain choices for this feature
+		choices = choices_callback(device)
+		setting = feature_choices(name, feature, choices,
+						read_function_id, write_function_id,
+						bytes_count=bytes_count,
+						label=None, description=None, device_kind=None)
+		return setting(device)
+	return instantiate
+
+def feature_range(name, feature, min_value, max_value,
+					read_function_id=_FeatureRW.default_read_fnid,
+					write_function_id=_FeatureRW.default_write_fnid,
+					rw=None,
+					bytes_count=None,
+					label=None, description=None, device_kind=None):
+	validator = _RangeV(min_value, max_value, bytes_count=bytes_count)
+	if rw is None:
+		rw = _FeatureRW(feature, read_function_id, write_function_id)
+	return _Setting(name, rw, validator, kind=_KIND.range, label=label, description=description, device_kind=device_kind)
+
 #
 # common strings for settings
 #
@@ -88,7 +130,9 @@ _FN_SWAP = ('fn-swap', _("Swap Fx function"),
 						 	"and you must hold the FN key to activate their special function."))
 _HAND_DETECTION = ('hand-detection', _("Hand Detection"),
 							_("Turn on illumination when the hands hover over the keyboard."))
-
+_SMART_SHIFT = ('smart-shift', _("Smart Shift"),
+							_("Automatically switch the mouse wheel between ratchet and freespin mode.\n"
+							"The mouse wheel is always free at 0, and always locked at 50"))
 #
 #
 #
@@ -130,6 +174,81 @@ def _feature_new_fn_swap():
 					label=_FN_SWAP[1], description=_FN_SWAP[2],
 					device_kind=_DK.keyboard)
 
+def _feature_smooth_scroll():
+	return feature_toggle(_SMOOTH_SCROLL[0], _F.HI_RES_SCROLLING,
+					label=_SMOOTH_SCROLL[1], description=_SMOOTH_SCROLL[2],
+					device_kind=_DK.mouse)
+
+def _feature_smart_shift():
+	_MIN_SMART_SHIFT_VALUE = 0
+	_MAX_SMART_SHIFT_VALUE = 50
+	class _SmartShiftRW(_FeatureRW):
+		def __init__(self, feature):
+			super(_SmartShiftRW, self).__init__(feature)
+
+		def read(self, device):
+			value = super(_SmartShiftRW, self).read(device)
+			if _bytes2int(value[0:1]) == 1:
+				# Mode = Freespin, map to minimum
+				return _int2bytes(_MIN_SMART_SHIFT_VALUE, count=1)
+			else:
+				# Mode = smart shift, map to the value, capped at maximum
+				threshold = min(_bytes2int(value[1:2]), _MAX_SMART_SHIFT_VALUE)
+				return _int2bytes(threshold, count=1)
+
+		def write(self, device, data_bytes):
+			threshold = _bytes2int(data_bytes)
+			# Freespin at minimum
+			mode = 1 if threshold == _MIN_SMART_SHIFT_VALUE else 2
+
+			# Ratchet at maximum
+			if threshold == _MAX_SMART_SHIFT_VALUE:
+				threshold = 255
+
+			data = _int2bytes(mode, count=1) + _int2bytes(threshold, count=1) * 2
+			return super(_SmartShiftRW, self).write(device, data)
+
+	return feature_range(_SMART_SHIFT[0], _F.SMART_SHIFT,
+	                _MIN_SMART_SHIFT_VALUE, _MAX_SMART_SHIFT_VALUE,
+					bytes_count=1,
+					rw=_SmartShiftRW(_F.SMART_SHIFT),
+					label=_SMART_SHIFT[1], description=_SMART_SHIFT[2],
+					device_kind=_DK.mouse)
+
+def _feature_adjustable_dpi_choices(device):
+	# [1] getSensorDpiList(sensorIdx)
+	reply = device.feature_request(_F.ADJUSTABLE_DPI, 0x10)
+	# Should not happen, but might happen when the user unplugs device while the
+	# query is being executed. TODO retry logic?
+	assert reply, 'Oops, DPI list cannot be retrieved!'
+	dpi_list = []
+	step = None
+	for val in _unpack('!7H', reply[1:1+14]):
+		if val == 0:
+			break
+		if val >> 13 == 0b111:
+			assert step is None and len(dpi_list) == 1, \
+					'Invalid DPI list item: %r' % val
+			step = val & 0x1fff
+		else:
+			dpi_list.append(val)
+	if step:
+		assert len(dpi_list) == 2, 'Invalid DPI list range: %r' % dpi_list
+		dpi_list = range(dpi_list[0], dpi_list[1] + 1, step)
+	return _NamedInts.list(dpi_list)
+
+def _feature_adjustable_dpi():
+	"""Pointer Speed feature"""
+	# Assume sensorIdx 0 (there is only one sensor)
+	# [2] getSensorDpi(sensorIdx) -> sensorIdx, dpiMSB, dpiLSB
+	# [3] setSensorDpi(sensorIdx, dpi)
+	return feature_choices_dynamic(_DPI[0], _F.ADJUSTABLE_DPI,
+					_feature_adjustable_dpi_choices,
+					read_function_id=0x20,
+					write_function_id=0x30,
+					bytes_count=3,
+					label=_DPI[1], description=_DPI[2],
+					device_kind=_DK.mouse)
 
 #
 #
@@ -144,6 +263,7 @@ _SETTINGS_LIST = namedtuple('_SETTINGS_LIST', [
 					'dpi',
 					'hand_detection',
 					'typing_illumination',
+					'smart_shift',
 					])
 del namedtuple
 
@@ -155,15 +275,17 @@ RegisterSettings = _SETTINGS_LIST(
 				dpi=_register_dpi,
 				hand_detection=_register_hand_detection,
 				typing_illumination=None,
+				smart_shift=None,
 			)
 FeatureSettings =  _SETTINGS_LIST(
 				fn_swap=_feature_fn_swap,
 				new_fn_swap=_feature_new_fn_swap,
-				smooth_scroll=None,
+				smooth_scroll=_feature_smooth_scroll,
 				side_scroll=None,
-				dpi=None,
+				dpi=_feature_adjustable_dpi,
 				hand_detection=None,
 				typing_illumination=None,
+				smart_shift=_feature_smart_shift,
 			)
 
 del _SETTINGS_LIST
@@ -178,6 +300,27 @@ def check_feature_settings(device, already_known):
 		return
 	if device.protocol and device.protocol < 2.0:
 		return
-	if not any(s.name == _FN_SWAP[0] for s in already_known) and _F.FN_INVERSION in device.features:
-		fn_swap = FeatureSettings.fn_swap()
-		already_known.append(fn_swap(device))
+
+	def check_feature(name, featureId, field_name=None):
+		"""
+		:param name: user-visible setting name.
+		:param featureId: the numeric Feature ID for this setting.
+		:param field_name: override the FeatureSettings name if it is
+		different from the user-visible setting name. Useful if there
+		are multiple features for the same setting.
+		"""
+		if not featureId in device.features:
+			return
+		if any(s.name == name for s in already_known):
+			return
+		if not field_name:
+			# Convert user-visible settings name for FeatureSettings
+			field_name = name.replace('-', '_')
+		feature = getattr(FeatureSettings, field_name)()
+		already_known.append(feature(device))
+
+	check_feature(_SMOOTH_SCROLL[0], _F.HI_RES_SCROLLING)
+	check_feature(_FN_SWAP[0],       _F.FN_INVERSION)
+	check_feature(_FN_SWAP[0],       _F.NEW_FN_INVERSION, 'new_fn_swap')
+	check_feature(_DPI[0],           _F.ADJUSTABLE_DPI)
+	check_feature(_SMART_SHIFT[0],   _F.SMART_SHIFT)

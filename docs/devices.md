@@ -5,7 +5,7 @@ least display some basic information about them.
 
 At this moment, all [Unifying Receiver][unifying] are supported (devices with
 USB ID `046d:c52b` or `046d:c532`), but only some newer [Nano Receiver][nano]s
-(devices with USB ID `046d:c52f`). You can check your connected Logitech devices
+(devices with USB ID `046d:c52f` and `046d:c52b`). You can check your connected Logitech devices
 by running `lsusb -d 046d:` in a console.
 
 For some devices, extra settings (usually not available through the standard
@@ -25,7 +25,8 @@ Linux system configuration) are supported:
 * The DPI can be changed on the [Performance MX Mouse][P_MX].
 
 * Smooth scrolling (higher sensitivity on vertical scrolling with the wheel) can
-  be toggled on the [M705 Marathon Mouse][M705] and [M510 Wireless Mouse][M510].
+  be toggled on the [M705 Marathon Mouse][M705], [M510 Wireless Mouse][M510] and
+  [M325][M325].
 
 
 # Supported features
@@ -62,7 +63,7 @@ Keyboards (Unifying):
 | K340             | 1.0   | yes     |                                         |
 | K350             | 1.0   | yes     |                                         |
 | K360             | 2.0   | yes     | FN swap, reprog keys                    |
-| K400 Touch       | 2.0   | yes     |                                         |
+| K400 Touch       | 2.0   | yes     | FN swap                                 |
 | K750 Solar       | 2.0   | yes     | FN swap, Lux reading, light button      |
 | K800 Illuminated | 1.0   | yes     | FN swap, reprog keys                    |
 | K830 Illuminated | 2.0   | yes     | FN swap                                 |
@@ -75,19 +76,20 @@ Mice (Unifying):
 | Device           | HID++ | Battery | DPI   | Other supported features        |
 |------------------|-------|---------|-------|---------------------------------|
 | M317             |       |         |       |                                 |
-| M325             | 2.0   | yes     | 1000  |                                 |
-| M345             | 2.0   | yes     | -     |                                 |
+| M325             | 2.0   | yes     | 1000  | smooth scrolling                |
+| M345             | 2.0   | yes     | -     | smooth scrolling                |
 | M350             | 1.0   | yes     |       |                                 |
 | M505             | 1.0   | yes     |       | smooth scrolling                |
 | M510             | 1.0   | yes     |       | smooth scrolling                |
-| M515 Couch       | 2.0   | yes     | -     |                                 |
-| M525             | 2.0   | yes     | -     |                                 |
+| M515 Couch       | 2.0   | yes     | -     | smooth scrolling                |
+| M525             | 2.0   | yes     | -     | smooth scrolling                |
 | M600 Touch       | 2.0   | yes     |       |                                 |
 | M705 Marathon    | 1.0   | yes     | -     | smooth scrolling                |
-| T400 Zone Touch  | 2.0   | yes     |       |                                 |
+| T400 Zone Touch  | 2.0   | yes     |       | smooth scrolling                |
 | T620 Touch       | 2.0   | yes     |       |                                 |
 | Performance MX   | 1.0   | yes     | R/W   | smooth scrolling                |
 | Anywhere MX      | 1.0   | yes     | R/W   | smooth scrolling                |
+| MX Master        | 4.5   | yes     | R/W   | smart shift                     |
 | Cube             | 2.0   | yes     |       |                                 |
 
 
@@ -106,6 +108,7 @@ Mice (Nano):
 | M305             | 1.0   | yes     |       |                                 |
 | M310             | 1.0   | yes     |       |                                 |
 | M315             |       | yes     |       |                                 |
+| MX 1100          | 1.0   | yes     | -     | smooth scrolling, side scrolling|
 
 
 Mice (Mini):
@@ -125,7 +128,7 @@ Trackballs (Unifying):
 
 | Device           | HID++ | Battery | DPI   | Other supported features        |
 |------------------|-------|---------|-------|---------------------------------|
-| M570 Trackball   |       |         |       |                                 |
+| M570 Trackball   | 1.0   | yes     | -     |                                 |
 
 
 Touchpads (Unifying):
@@ -133,7 +136,7 @@ Touchpads (Unifying):
 | Device           | HID++ | Battery | DPI   | Other supported features        |
 |------------------|-------|---------|-------|---------------------------------|
 | Wireless Touch   | 2.0   | yes     |       |                                 |
-| T650 Touchpad    | 2.0   | yes     |       |                                 |
+| T650 Touchpad    | 2.0   | yes     |       | smooth scrolling                |
 
 
 Mouse-Keyboard combos:
@@ -158,3 +161,4 @@ Mouse-Keyboard combos:
 [M705]: http://logitech.com/product/marathon-mouse-m705
 [P_MX]: http://logitech.com/product/performance-mouse-mx
 [A_MX]: http://logitech.com/product/anywhere-mouse-mx
+[M325]: http://logitech.com/product/wireless-mouse-m325
